@@ -55,8 +55,11 @@ export function aplicarMotorDePoliticas(
     const thresholdEscalonamento = override?.escalonamento_a_partir_de;
 
     // Regra dura: nível CRITICO em qualquer categoria sempre escalona,
-    // independente de qualquer configuração de política.
-    if (achado.level === "CRITICO" && regras.prevalencia_categoria_critica) {
+    // independente de qualquer configuração de política — inclusive se uma
+    // política futura desativar `prevalencia_categoria_critica` (esse campo
+    // não governa esta regra; é o motor, não o prompt nem a política, que
+    // garante "risco crítico sempre escalona", Especificação Seção 8/31).
+    if (achado.level === "CRITICO") {
       decisaoFinal = maisSevera(decisaoFinal, "ESCALONAMENTO_PRIORITARIO");
       continue;
     }

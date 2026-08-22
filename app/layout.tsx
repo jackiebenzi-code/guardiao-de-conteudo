@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SairButton from "./components/SairButton";
 
 export const metadata: Metadata = {
   title: "Guardião de Conteúdo — protótipo pessoal",
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/perfil" className="hover:underline">
                 Perfil da criança
               </a>
+              <SairButton />
             </nav>
           </div>
         </header>

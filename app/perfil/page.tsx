@@ -11,15 +11,19 @@ interface Perfil {
   observacoes: string | null;
 }
 
+const PERFIL_VAZIO = { apelido: "", min: 7, max: 9, observacoes: "" };
+
 export default function PerfilPage() {
   const supabase = createClient();
   const [perfis, setPerfis] = useState<Perfil[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [apelido, setApelido] = useState("");
-  const [min, setMin] = useState(7);
-  const [max, setMax] = useState(9);
-  const [observacoes, setObservacoes] = useState("");
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [apelido, setApelido] = useState(PERFIL_VAZIO.apelido);
+  const [min, setMin] = useState(PERFIL_VAZIO.min);
+  const [max, setMax] = useState(PERFIL_VAZIO.max);
+  const [observacoes, setObservacoes] = useState(PERFIL_VAZIO.observacoes);
   const [salvando, setSalvando] = useState(false);
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState<string | null>(null);
 
   async function carregar() {
@@ -36,37 +40,90 @@ export default function PerfilPage() {
     carregar();
   }, []);
 
-  async function criarPerfil(e: React.FormEvent) {
+  function limparFormulario() {
+    setEditandoId(null);
+    setApelido(PERFIL_VAZIO.apelido);
+    setMin(PERFIL_VAZIO.min);
+    setMax(PERFIL_VAZIO.max);
+    setObservacoes(PERFIL_VAZIO.observacoes);
+  }
+
+  function iniciarEdicao(p: Perfil) {
+    setEditandoId(p.id);
+    setApelido(p.apelido);
+    setMin(p.faixa_etaria_min);
+    setMax(p.faixa_etaria_max);
+    setObservacoes(p.observacoes ?? "");
+    setMensagem(null);
+  }
+
+  async function salvarPerfil(e: React.FormEvent) {
     e.preventDefault();
     setSalvando(true);
     setMensagem(null);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    if (editandoId) {
+      const { error } = await supabase
+        .from("child_profiles")
+        .update({
+          apelido,
+          faixa_etaria_min: min,
+          faixa_etaria_max: max,
+          observacoes: observacoes || null,
+        })
+        .eq("id", editandoId);
 
-    if (!user) {
-      setMensagem("Sessão expirada, faça login novamente.");
       setSalvando(false);
-      return;
+      if (error) {
+        setMensagem(`Erro ao salvar: ${error.message}`);
+        return;
+      }
+    } else {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setMensagem("Sessão expirada, faça login novamente.");
+        setSalvando(false);
+        return;
+      }
+
+      const { error } = await supabase.from("child_profiles").insert({
+        guardian_id: user.id,
+        apelido,
+        faixa_etaria_min: min,
+        faixa_etaria_max: max,
+        observacoes: observacoes || null,
+      });
+
+      setSalvando(false);
+      if (error) {
+        setMensagem(`Erro ao salvar: ${error.message}`);
+        return;
+      }
     }
 
-    const { error } = await supabase.from("child_profiles").insert({
-      guardian_id: user.id,
-      apelido,
-      faixa_etaria_min: min,
-      faixa_etaria_max: max,
-      observacoes: observacoes || null,
-    });
+    limparFormulario();
+    await carregar();
+  }
 
-    setSalvando(false);
+  async function excluirPerfil(id: string) {
+    const confirmado = window.confirm(
+      "Excluir este perfil? Análises já feitas continuam no histórico, só deixam de estar ligadas a ele."
+    );
+    if (!confirmado) return;
+
+    setExcluindoId(id);
+    setMensagem(null);
+    const { error } = await supabase.from("child_profiles").delete().eq("id", id);
+    setExcluindoId(null);
+
     if (error) {
-      setMensagem(`Erro ao salvar: ${error.message}`);
+      setMensagem(`Erro ao excluir: ${error.message}`);
       return;
     }
-
-    setApelido("");
-    setObservacoes("");
+    if (editandoId === id) limparFormulario();
     await carregar();
   }
 
@@ -87,19 +144,43 @@ export default function PerfilPage() {
           <ul className="space-y-2">
             {perfis.map((p) => (
               <li key={p.id} className="card">
-                <p className="font-medium">{p.apelido}</p>
-                <p className="text-sm text-neutral-500">
-                  {p.faixa_etaria_min}–{p.faixa_etaria_max} anos
-                </p>
-                {p.observacoes && <p className="mt-1 text-sm text-neutral-600">{p.observacoes}</p>}
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-medium">{p.apelido}</p>
+                    <p className="text-sm text-neutral-500">
+                      {p.faixa_etaria_min}–{p.faixa_etaria_max} anos
+                    </p>
+                    {p.observacoes && <p className="mt-1 text-sm text-neutral-600">{p.observacoes}</p>}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button type="button" className="btn-secondary" onClick={() => iniciarEdicao(p)}>
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => excluirPerfil(p.id)}
+                      disabled={excluindoId === p.id}
+                    >
+                      {excluindoId === p.id ? "Excluindo…" : "Excluir"}
+                    </button>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
         )
       )}
 
-      <form onSubmit={criarPerfil} className="card space-y-4">
-        <h2 className="font-medium">Adicionar perfil</h2>
+      <form onSubmit={salvarPerfil} className="card space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-medium">{editandoId ? "Editar perfil" : "Adicionar perfil"}</h2>
+          {editandoId && (
+            <button type="button" className="text-sm text-neutral-500 underline" onClick={limparFormulario}>
+              Cancelar edição
+            </button>
+          )}
+        </div>
         <div>
           <label htmlFor="apelido" className="label">
             Apelido
@@ -158,7 +239,7 @@ export default function PerfilPage() {
         </div>
         {mensagem && <p className="text-sm text-risco-alto">{mensagem}</p>}
         <button type="submit" className="btn-primary" disabled={salvando}>
-          {salvando ? "Salvando…" : "Salvar perfil"}
+          {salvando ? "Salvando…" : editandoId ? "Salvar alterações" : "Salvar perfil"}
         </button>
       </form>
     </div>
