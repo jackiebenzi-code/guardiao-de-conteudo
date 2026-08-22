@@ -32,13 +32,25 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const isLoginRoute = request.nextUrl.pathname.startsWith("/login");
   const isPublicRoute =
-    request.nextUrl.pathname.startsWith("/login") ||
+    isLoginRoute ||
+    request.nextUrl.pathname.startsWith("/esqueci-senha") ||
+    // O link de recuperação carrega o token no fragmento da URL (#access_token=...),
+    // que nunca chega ao servidor — então esta rota tem que ficar acessível sem
+    // sessão prévia para o client-side conseguir ler o token e autenticar.
+    request.nextUrl.pathname.startsWith("/redefinir-senha") ||
     request.nextUrl.pathname.startsWith("/_next") ||
     request.nextUrl.pathname.startsWith("/favicon");
 
   if (!user && !isPublicRoute) {
     const redirectUrl = new URL("/login", request.url);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  // Já autenticado tentando ver a tela de login: não faz sentido, manda pro painel.
+  if (user && isLoginRoute) {
+    const redirectUrl = new URL("/", request.url);
     return NextResponse.redirect(redirectUrl);
   }
 

@@ -91,13 +91,20 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <button
-          type="button"
-          className="mt-4 text-sm text-neutral-500 underline"
-          onClick={() => setModo(modo === "entrar" ? "criar_conta" : "entrar")}
-        >
-          {modo === "entrar" ? "Ainda não tenho conta" : "Já tenho conta"}
-        </button>
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <button
+            type="button"
+            className="text-neutral-500 underline"
+            onClick={() => setModo(modo === "entrar" ? "criar_conta" : "entrar")}
+          >
+            {modo === "entrar" ? "Ainda não tenho conta" : "Já tenho conta"}
+          </button>
+          {modo === "entrar" && (
+            <a href="/esqueci-senha" className="text-neutral-500 underline">
+              Esqueci minha senha
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -5,15 +5,7 @@ que [`docs/LIMITACOES.md`](./LIMITACOES.md) já define como escopo desta versão
 (a especificação comercial completa em `ESPECIFICACAO_ORIGINAL.md` não é o
 alvo do v0 — isso já está documentado e não entra nesta lista).
 
-## ⚠️ Ação urgente, fora do código
-
-- **O projeto Supabase (`guardiao-de-conteudo`, `kssuvgxwsixpercudybo`) está
-  pausado (`INACTIVE`)** — provavelmente por inatividade no plano gratuito.
-  Enquanto estiver pausado, login, cadastro de perfil e análise não
-  funcionam (a chamada ao banco falha). É preciso reativar o projeto no
-  painel do Supabase (ou eu reativo, se você confirmar) antes de usar o app.
-
-## Corrigido nesta passada
+## Corrigido
 
 - **Faltava logout na interface.** Dava para entrar, mas não tinha como sair
   pela tela — só apagando cookies manualmente. Adicionado botão "Sair" no
@@ -22,25 +14,43 @@ alvo do v0 — isso já está documentado e não entra nesta lista).
   policy de RLS para leitura (`SELECT`); o `insert` feito a cada análise
   (`app/api/analisar/route.ts`) era negado silenciosamente pelo Postgres, sem
   erro visível. Adicionada a policy de `INSERT` que faltava
-  (`supabase/migrations/0002_audit_events_insert_policy.sql`). **Precisa
-  aplicar essa migração no projeto Supabase** (assim que ele for reativado)
-  para o efeito valer em produção — no dashboard, em SQL Editor, ou via
-  `supabase db push` se você usar a CLI localmente.
+  (`supabase/migrations/0002_audit_events_insert_policy.sql`) — **já aplicada
+  no projeto Supabase em produção** (`kssuvgxwsixpercudybo`), confirmada
+  contra `pg_policies` e com o advisor de segurança do Supabase limpo.
+- **O projeto Supabase estava pausado (`INACTIVE`)** por inatividade no plano
+  gratuito — **reativado**, agora `ACTIVE_HEALTHY`.
+- **Testes automatizados do motor de políticas e do mascaramento.** Antes não
+  havia nenhum teste no projeto. Adicionado `vitest` (`npm test`) com 20
+  testes cobrindo `lib/policy/engine.ts` (contra a política real de produção,
+  `v1-protecao-reforcada`) e `lib/sanitize/mask.ts` — as duas peças que
+  garantem "nunca aprova sozinho".
+  - Nesse processo, achei e corrigi um bug real: a regra "categoria CRITICO
+    sempre escalona" (`aplicarMotorDePoliticas`) estava condicionada à flag
+    `prevalencia_categoria_critica` da política, apesar do próprio comentário
+    no código dizer que era uma regra dura "independente de qualquer
+    configuração". Com a política atual (`prevalencia_categoria_critica:
+    true`) isso nunca deu problema na prática, mas uma política futura com
+    essa flag em `false` faria um sinal CRITICO cair pra "BLOQUEADO" em vez
+    de "ESCALONAMENTO_PRIORITARIO" — ainda vai pra revisão, não aprova
+    sozinho, mas perde a prioridade máxima. Corrigido para ser
+    incondicional, com teste cobrindo o caso.
+- **Editar/excluir perfil da criança.** Antes só dava pra cadastrar. Agora
+  `app/perfil/page.tsx` tem botões "Editar" e "Excluir" em cada perfil.
+- **`/login` não redirecionava quem já estava logado.** Corrigido no
+  `middleware.ts`: usuário autenticado que acessa `/login` agora vai direto
+  pro painel.
+- **"Esqueci minha senha".** Fluxo completo adicionado:
+  `/esqueci-senha` (pedir o link por e-mail, via
+  `supabase.auth.resetPasswordForEmail`) e `/redefinir-senha` (definir a
+  nova senha, via `supabase.auth.updateUser`). Link "Esqueci minha senha" na
+  tela de login.
 
-## Ainda falta (pequeno, não bloqueia uso)
-
-- **Editar/excluir perfil da criança.** Hoje só dá para cadastrar; não tem
-  como corrigir apelido/faixa etária ou remover um perfil pela tela.
-- **"Esqueci minha senha".** Não tem fluxo de recuperação — para uso de uma
-  pessoa só isso é tolerável, mas é um ponto cego se a senha for perdida.
-- **`/login` não redireciona quem já está logado.** Sem problema funcional,
-  só uma tela desnecessária se a pessoa acessar `/login` já autenticada.
-- **Nenhum teste automatizado.** A especificação original pede suíte
-  completa (RLS, schema da IA, fallback, prompt injection etc.); o recorte
-  pessoal não exige isso, mas vale pelo menos alguns testes do motor de
-  políticas (`lib/policy/engine.ts`) e do mascaramento
-  (`lib/sanitize/mask.ts`), que são as duas peças que garantem "nunca aprova
-  sozinho" — são puras e fáceis de testar sem infraestrutura.
+  ⚠️ **Ação pendente fora do código**: esse fluxo só funciona se o painel do
+  Supabase (Authentication → URL Configuration) tiver a URL do app nas
+  **Redirect URLs** permitidas — inclua algo como
+  `https://SEU-DOMINIO/redefinir-senha` (e o preview da Vercel, se quiser
+  testar por lá antes do domínio final). Sem isso, o Supabase rejeita ou
+  ignora o `redirectTo` e o link do e-mail não leva a lugar nenhum.
 
 ## Fora de escopo de propósito (já documentado, não é pendência)
 
@@ -52,9 +62,21 @@ de ID de vídeo/canal, moderação de comentários, denúncia automática.
 
 ## Verificado nesta passada
 
-- `npm run typecheck` e `npm run build` passam limpos.
+- `npm run typecheck`, `npm test` (20 testes) e `npm run build` passam limpos.
 - RLS revisada tabela a tabela contra `0001_schema_inicial_v0.sql`: todas as
   outras tabelas (`guardians`, `child_profiles`, `content_submissions`,
   `analyses`, `risk_findings`, `trusted_content_rules`) já tinham policy de
   `INSERT`/`UPDATE` cobrindo o que o código realmente usa — só `audit_events`
-  tinha o buraco acima.
+  tinha o buraco corrigido acima.
+- Advisor de segurança do Supabase (`get_advisors`) sem alertas após as
+  mudanças de RLS.
+
+## O que ainda não existe (consciente, não é urgente)
+
+- Painel administrativo, quotas/planos, PIN parental separado, WebAuthn —
+  tudo isso é da especificação comercial completa, fora do recorte pessoal
+  (ver `docs/LIMITACOES.md`).
+- O projeto Vercel antigo/duplicado (`guardiao-de-conteudo`, distinto de
+  `guardiao-de-conteudo-app`) ainda está conectado ao repositório e continua
+  falhando build a cada push — remover/desconectar esse projeto no painel da
+  Vercel é uma ação manual, fora do meu acesso.
