@@ -5,7 +5,9 @@ de proteção. Recorte enxuto da especificação original, priorizado para uso r
 uma família, não para venda.
 
 Antes de mexer no código, leia [`docs/LIMITACOES.md`](./docs/LIMITACOES.md) — explica
-com clareza o que isto faz e, principalmente, o que **não** faz.
+com clareza o que isto faz e, principalmente, o que **não** faz. Veja também
+[`docs/CHECKLIST_CONCLUSAO.md`](./docs/CHECKLIST_CONCLUSAO.md) para o que falta
+concluir.
 
 ## Como rodar localmente
 
